@@ -39,7 +39,7 @@ def collect_rag_outputs(vectorstore, version):
             out = run_rag(retriever, llm, PROMPTS[version], qa["question"])
         except Exception as exc:
             msg = str(exc).lower()
-            if any(x in msg for x in ("429", "rate limit", "quota", "resource_exhausted", "timeout")):
+            if any(x in msg for x in ("429", "rate limit", "quota", "resource_exhausted", "timeout", "503", "unavailable", "high demand")):
                 checkpoint.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
                 print(f"\nSTOP: provider quota/timeout at {version} {i-1}/{len(QA_PAIRS)}.")
                 print("Đổi API/model rồi chạy lại; checkpoint sẽ được tiếp tục.")
