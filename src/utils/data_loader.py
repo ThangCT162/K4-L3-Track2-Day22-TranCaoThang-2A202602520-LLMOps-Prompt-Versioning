@@ -64,6 +64,13 @@ def build_vectorstore(chunks: list, embeddings):
     from langchain_community.vectorstores import FAISS
 
     print(f"🔨 Đang tạo FAISS index từ {len(chunks)} chunks ...")
-    vectorstore = FAISS.from_texts(chunks, embeddings)
+    # Embed in small batches to avoid exhausting local Ollama stack/memory.
+    batch_size = 8
+    vectors = []
+    for start in range(0, len(chunks), batch_size):
+        batch = chunks[start:start + batch_size]
+        vectors.extend(embeddings.embed_documents(batch))
+        print(f"embeddings: {min(start + batch_size, len(chunks))}/{len(chunks)}")
+    vectorstore = FAISS.from_embeddings(list(zip(chunks, vectors)), embeddings)
     print("✅ FAISS vectorstore đã sẵn sàng.")
     return vectorstore
