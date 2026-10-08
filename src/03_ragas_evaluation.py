@@ -30,11 +30,24 @@ def run_rag(retriever, llm, prompt, question):
     return {"answer": answer, "contexts": contexts}
 
 def collect_rag_outputs(vectorstore, version):
-    retriever = vectorstore.as_retriever(search_kwargs={"k": 3}); llm = get_llm(); results = []
-    for i, qa in enumerate(QA_PAIRS, 1):
-        out = run_rag(retriever, llm, PROMPTS[version], qa["question"])
+    checkpoint = Path(__file__).parent.parent / "data" / f"rag_{version}_checkpoint.json"
+    results = json.loads(checkpoint.read_text(encoding="utf-8")) if checkpoint.exists() else []
+    retriever = vectorstore.as_retriever(search_kwargs={"k": 3}); llm = get_llm()
+    print(f"{version}: resume từ {len(results)}/{len(QA_PAIRS)} câu")
+    for i, qa in enumerate(QA_PAIRS[len(results):], len(results) + 1):
+        try:
+            out = run_rag(retriever, llm, PROMPTS[version], qa["question"])
+        except Exception as exc:
+            msg = str(exc).lower()
+            if any(x in msg for x in ("429", "rate limit", "quota", "resource_exhausted", "timeout")):
+                checkpoint.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
+                print(f"\nSTOP: provider quota/timeout at {version} {i-1}/{len(QA_PAIRS)}.")
+                print("Đổi API/model rồi chạy lại; checkpoint sẽ được tiếp tục.")
+                raise SystemExit(2)
+            raise
         results.append({"question": qa["question"], "reference": qa["reference"], "answer": out["answer"], "contexts": out["contexts"]})
-        print(f"[{i:02d}/50] {qa['question'][:60]}")
+        checkpoint.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"[{i:02d}/50] {qa['question'][:60]} | checkpoint saved")
     return results
 
 def build_ragas_dataset(rag_results):
