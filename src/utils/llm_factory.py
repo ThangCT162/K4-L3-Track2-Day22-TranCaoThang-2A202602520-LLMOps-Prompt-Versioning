@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import config
 
 
-def get_llm(provider: str = None, temperature: float = 0.0):
+def get_llm(provider: str = None, temperature: float = 0.0, max_tokens: int = 1024):
     """
     Trả về BaseChatModel tương ứng với provider được chọn.
 
@@ -34,8 +34,10 @@ def get_llm(provider: str = None, temperature: float = 0.0):
     """
     provider = (provider or config.PROVIDER).lower()
 
-    if provider == "openai":
+    if provider in ("openai", "groq"):
         from langchain_openai import ChatOpenAI
+        if provider == "groq":
+            return ChatOpenAI(model=config.GROQ_MODEL, api_key=config.GROQ_API_KEY, base_url=config.GROQ_BASE_URL, temperature=temperature, max_tokens=max_tokens, n=1, max_retries=3)
         kwargs = {
             "model": config.OPENAI_MODEL,
             "api_key": config.OPENAI_API_KEY,
@@ -51,6 +53,7 @@ def get_llm(provider: str = None, temperature: float = 0.0):
             model=config.GEMINI_MODEL,
             google_api_key=config.GOOGLE_API_KEY,
             temperature=temperature,
+            max_output_tokens=1024,
         )
 
     elif provider == "anthropic":
@@ -105,7 +108,7 @@ def get_embeddings(provider: str = None):
     """
     provider = (provider or config.PROVIDER).lower()
 
-    if provider in ("openai", "openrouter"):
+    if provider in ("openai", "openrouter") and config.EMBEDDING_PROVIDER == "openai":
         from langchain_openai import OpenAIEmbeddings
         kwargs = {
             "model": config.OPENAI_EMBEDDING_MODEL,
@@ -115,6 +118,12 @@ def get_embeddings(provider: str = None):
             kwargs["base_url"] = config.OPENAI_BASE_URL
         return OpenAIEmbeddings(**kwargs)
 
+    elif config.EMBEDDING_PROVIDER == "local":
+        from langchain_community.embeddings import HuggingFaceEmbeddings
+        return HuggingFaceEmbeddings(model_name=config.LOCAL_EMBEDDING_MODEL)
+    elif config.EMBEDDING_PROVIDER == "ollama":
+        from langchain_ollama import OllamaEmbeddings
+        return OllamaEmbeddings(model=config.OLLAMA_EMBEDDING_MODEL, base_url=config.OLLAMA_BASE_URL)
     elif provider == "gemini":
         from langchain_google_genai import GoogleGenerativeAIEmbeddings
         return GoogleGenerativeAIEmbeddings(

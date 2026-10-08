@@ -21,6 +21,11 @@ os.environ["LANGCHAIN_ENDPOINT"]   = os.getenv("LANGCHAIN_ENDPOINT", "https://ap
 # ── Provider mặc định ─────────────────────────────────────────────────────
 # Đổi giá trị PROVIDER trong .env: openai | gemini | anthropic | ollama | openrouter
 PROVIDER = os.getenv("PROVIDER", "openai").lower()
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", os.getenv("OPENAI_API_KEY", ""))
+GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "openai").lower()
+LOCAL_EMBEDDING_MODEL = os.getenv("LOCAL_EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 
 # ── OpenAI ────────────────────────────────────────────────────────────────
 OPENAI_API_KEY         = os.getenv("OPENAI_API_KEY", "")
@@ -62,8 +67,8 @@ def validate() -> bool:
     if not LANGSMITH_API_KEY:
         missing.append("LANGCHAIN_API_KEY (LangSmith)")
 
-    if PROVIDER == "openai" and not OPENAI_API_KEY:
-        missing.append("OPENAI_API_KEY")
+    if PROVIDER in ("openai", "groq") and not (OPENAI_API_KEY if PROVIDER == "openai" else GROQ_API_KEY):
+        missing.append("OPENAI_API_KEY" if PROVIDER == "openai" else "GROQ_API_KEY (or OPENAI_API_KEY)")
     elif PROVIDER == "gemini" and not GOOGLE_API_KEY:
         missing.append("GOOGLE_API_KEY")
     elif PROVIDER == "anthropic" and not ANTHROPIC_API_KEY:
