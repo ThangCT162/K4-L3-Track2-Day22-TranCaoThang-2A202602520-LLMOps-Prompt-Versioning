@@ -57,10 +57,12 @@ def run_ragas_eval(rag_results, version):
     result = evaluate(
         build_ragas_dataset(rag_results),
         metrics=[faithfulness, answer_relevancy, context_recall, context_precision],
-        llm=get_llm(temperature=0, max_tokens=4096),
+        # Groq free/on-demand tiers can enforce a very small output-token
+        # budget per minute; RAGAS needs short JSON judgments only.
+        llm=get_llm(temperature=0, max_tokens=512),
         embeddings=get_embeddings(),
-        run_config=RunConfig(max_workers=2, max_retries=3, max_wait=30, timeout=180),
-        batch_size=5,
+        run_config=RunConfig(max_workers=1, max_retries=2, max_wait=30, timeout=180),
+        batch_size=1,
         raise_exceptions=False,
     )
     scores = {k: float(np.mean([v for v in result[k] if v is not None])) for k in ["faithfulness", "answer_relevancy", "context_recall", "context_precision"]}
