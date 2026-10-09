@@ -61,7 +61,8 @@ def run_ragas_eval(rag_results, version):
         result = evaluate(
             EvaluationDataset(samples=[SingleTurnSample(user_input=sample["question"], response=sample["answer"], retrieved_contexts=sample["contexts"], reference=sample["reference"])]),
             metrics=[faithfulness, answer_relevancy, context_recall, context_precision],
-            llm=get_llm(temperature=0, max_tokens=900), embeddings=get_embeddings(),
+            # Evaluate locally to avoid Groq's strict output-token quota.
+            llm=get_llm("ollama", temperature=0, max_tokens=2048), embeddings=get_embeddings(),
             run_config=RunConfig(max_workers=1, max_retries=2, max_wait=30, timeout=180),
             batch_size=1, raise_exceptions=False,
         )
