@@ -1,0 +1,8 @@
+Source: actual run of python src/02_prompt_hub_ab_routing.py
+
+Prompt Hub versions pulled:
+- trancao-thang-rag-prompt-v1
+- trancao-thang-rag-prompt-v2
+
+Deterministic A/B routing completed for 50 questions.
+Observed routing: V1=19, V2=31, total=50.

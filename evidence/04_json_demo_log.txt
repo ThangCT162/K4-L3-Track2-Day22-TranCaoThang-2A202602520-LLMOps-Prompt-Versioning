@@ -1,0 +1,7 @@
+Source: actual run of python src/04_guardrails_validator.py
+
+[Valid JSON] pass
+[Markdown fences] repaired to valid JSON
+[Single quotes] repaired to valid JSON
+[Trailing comma] repaired to valid JSON
+[Truly invalid] returned valid fallback error JSON
