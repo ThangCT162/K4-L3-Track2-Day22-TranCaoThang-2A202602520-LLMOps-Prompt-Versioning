@@ -57,6 +57,25 @@ def run_ragas_eval(rag_results, version):
     checkpoint = Path(__file__).parent.parent / "data" / f"ragas_{version}_eval_checkpoint.json"
     rows = json.loads(checkpoint.read_text(encoding="utf-8")) if checkpoint.exists() else []
     metric_names = ["faithfulness", "answer_relevancy", "context_recall", "context_precision"]
+    # Repair NaN faithfulness scores without recomputing the other metrics.
+    if len(rows) == len(rag_results):
+        for i, sample in enumerate(rag_results):
+            value = rows[i].get("faithfulness")
+            if value is not None and np.isfinite(float(value)):
+                continue
+            try:
+                result = evaluate(
+                    EvaluationDataset(samples=[SingleTurnSample(user_input=sample["question"], response=sample["answer"], retrieved_contexts=sample["contexts"], reference=sample["reference"])]),
+                    metrics=[faithfulness], llm=get_llm("ollama", temperature=0, max_tokens=2048), embeddings=get_embeddings(),
+                    run_config=RunConfig(max_workers=1, max_retries=1, max_wait=30, timeout=600),
+                    batch_size=1, raise_exceptions=False,
+                )
+                rows[i]["faithfulness"] = float(result["faithfulness"][0])
+            except Exception as exc:
+                print(f"faithfulness repair {version} {i+1}/50 failed: {type(exc).__name__}")
+                rows[i]["faithfulness"] = None
+            checkpoint.write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
+            print(f"faithfulness repair {version}: {i+1}/50 | checkpoint saved")
     for i, sample in enumerate(rag_results[len(rows):], len(rows) + 1):
         try:
             result = evaluate(
