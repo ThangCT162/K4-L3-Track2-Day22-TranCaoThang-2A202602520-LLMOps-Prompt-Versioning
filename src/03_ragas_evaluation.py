@@ -58,15 +58,19 @@ def run_ragas_eval(rag_results, version):
     rows = json.loads(checkpoint.read_text(encoding="utf-8")) if checkpoint.exists() else []
     metric_names = ["faithfulness", "answer_relevancy", "context_recall", "context_precision"]
     for i, sample in enumerate(rag_results[len(rows):], len(rows) + 1):
-        result = evaluate(
-            EvaluationDataset(samples=[SingleTurnSample(user_input=sample["question"], response=sample["answer"], retrieved_contexts=sample["contexts"], reference=sample["reference"])]),
-            metrics=[faithfulness, answer_relevancy, context_recall, context_precision],
-            # Evaluate locally to avoid Groq's strict output-token quota.
-            llm=get_llm("ollama", temperature=0, max_tokens=2048), embeddings=get_embeddings(),
-            run_config=RunConfig(max_workers=1, max_retries=2, max_wait=30, timeout=180),
-            batch_size=1, raise_exceptions=False,
-        )
-        rows.append({k: (float(result[k][0]) if result[k][0] is not None else None) for k in metric_names})
+        try:
+            result = evaluate(
+                EvaluationDataset(samples=[SingleTurnSample(user_input=sample["question"], response=sample["answer"], retrieved_contexts=sample["contexts"], reference=sample["reference"])]),
+                metrics=[faithfulness, answer_relevancy, context_recall, context_precision],
+                llm=get_llm("ollama", temperature=0, max_tokens=2048), embeddings=get_embeddings(),
+                run_config=RunConfig(max_workers=1, max_retries=2, max_wait=30, timeout=180),
+                batch_size=1, raise_exceptions=False,
+            )
+            row = {k: (float(result[k][0]) if result[k][0] is not None else None) for k in metric_names}
+        except Exception as exc:
+            print(f"evaluation {version}: {i}/{len(rag_results)} failed ({type(exc).__name__}); saved as null")
+            row = {k: None for k in metric_names}
+        rows.append(row)
         checkpoint.write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
         print(f"evaluation {version}: {i}/{len(rag_results)} | checkpoint saved")
     scores = {k: float(np.mean([r[k] for r in rows if r.get(k) is not None])) for k in metric_names}
