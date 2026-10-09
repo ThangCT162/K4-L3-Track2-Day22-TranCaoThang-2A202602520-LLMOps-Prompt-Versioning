@@ -54,20 +54,22 @@ def build_ragas_dataset(rag_results):
     return EvaluationDataset(samples=[SingleTurnSample(user_input=r["question"], response=r["answer"], retrieved_contexts=r["contexts"], reference=r["reference"]) for r in rag_results])
 
 def run_ragas_eval(rag_results, version):
-    result = evaluate(
-        build_ragas_dataset(rag_results),
-        metrics=[faithfulness, answer_relevancy, context_recall, context_precision],
-        # Groq free/on-demand tiers can enforce a very small output-token
-        # budget per minute; RAGAS needs short JSON judgments only.
-        llm=get_llm(temperature=0, max_tokens=512),
-        embeddings=get_embeddings(),
-        run_config=RunConfig(max_workers=1, max_retries=2, max_wait=30, timeout=180),
-        batch_size=1,
-        raise_exceptions=False,
-    )
-    scores = {k: float(np.mean([v for v in result[k] if v is not None])) for k in ["faithfulness", "answer_relevancy", "context_recall", "context_precision"]}
+    checkpoint = Path(__file__).parent.parent / "data" / f"ragas_{version}_eval_checkpoint.json"
+    rows = json.loads(checkpoint.read_text(encoding="utf-8")) if checkpoint.exists() else []
+    metric_names = ["faithfulness", "answer_relevancy", "context_recall", "context_precision"]
+    for i, sample in enumerate(rag_results[len(rows):], len(rows) + 1):
+        result = evaluate(
+            EvaluationDataset(samples=[SingleTurnSample(user_input=sample["question"], response=sample["answer"], retrieved_contexts=sample["contexts"], reference=sample["reference"])]),
+            metrics=[faithfulness, answer_relevancy, context_recall, context_precision],
+            llm=get_llm(temperature=0, max_tokens=900), embeddings=get_embeddings(),
+            run_config=RunConfig(max_workers=1, max_retries=2, max_wait=30, timeout=180),
+            batch_size=1, raise_exceptions=False,
+        )
+        rows.append({k: (float(result[k][0]) if result[k][0] is not None else None) for k in metric_names})
+        checkpoint.write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"evaluation {version}: {i}/{len(rag_results)} | checkpoint saved")
+    scores = {k: float(np.mean([r[k] for r in rows if r.get(k) is not None])) for k in metric_names}
     print(version, scores); return scores
-
 def main():
     if not config.validate(): sys.exit(1)
     vs = setup_vectorstore(); v1 = run_ragas_eval(collect_rag_outputs(vs, "v1"), "v1"); v2 = run_ragas_eval(collect_rag_outputs(vs, "v2"), "v2")
