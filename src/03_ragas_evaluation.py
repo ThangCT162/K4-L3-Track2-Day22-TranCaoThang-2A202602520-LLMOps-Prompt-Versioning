@@ -63,7 +63,7 @@ def run_ragas_eval(rag_results, version):
                 EvaluationDataset(samples=[SingleTurnSample(user_input=sample["question"], response=sample["answer"], retrieved_contexts=sample["contexts"], reference=sample["reference"])]),
                 metrics=[faithfulness, answer_relevancy, context_recall, context_precision],
                 llm=get_llm("ollama", temperature=0, max_tokens=2048), embeddings=get_embeddings(),
-                run_config=RunConfig(max_workers=1, max_retries=2, max_wait=30, timeout=180),
+                run_config=RunConfig(max_workers=1, max_retries=1, max_wait=30, timeout=600),
                 batch_size=1, raise_exceptions=False,
             )
             row = {k: (float(result[k][0]) if result[k][0] is not None else None) for k in metric_names}
